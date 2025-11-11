@@ -6,7 +6,7 @@ import os
 
 # --- Beveiligde Token Lading ---
 # Belangrijk: De waarde wordt op het hostingplatform (Render) ingesteld als een variabele genaamd DISCORD_TOKEN.
-TOKEN = os.getenv('DISCORD_TOKEN')
+TOKEN = os.getenv('MTQzNzQ1NjM3MjA4OTIyOTM0Mw.G6CKih.MjtUroR_E2B1R8p0BTCZQmD_1lSTAKQ_3CuSVg')
 
 # --- Discord Bot Configuratie & Intents setup ---
 intents = discord.Intents.default()
