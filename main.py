@@ -2,10 +2,10 @@ import discord
 from discord.ext import commands
 from fuzzywuzzy import process
 from datetime import datetime, timezone
-import os 
+import os
 
 # --- Beveiligde Token Lading ---
-# Belangrijk: De waarde wordt op het hostingplatform (Render) ingesteld als een variabele genaamd DISCORD_TOKEN.
+# Belangrijk: De token wordt op het hostingplatform (Railway) ingesteld als een variabele genaamd DISCORD_TOKEN.
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 # --- Discord Bot Configuratie & Intents setup ---
@@ -40,7 +40,7 @@ SELL_ANSWER = (
 )
 # -------------------------------------------------------------------
 
-# --- Extensive QA dataset for the bot ---
+# --- 1. SERVER-SPECIFIEKE QA (Eerste zoekopdracht) ---
 qa_data = {
     # 1. Server Connection & Status
     "how do i join the server?":
@@ -75,8 +75,10 @@ qa_data = {
     "Yes, raiding other players' bases is a core part of the gameplay.",
     "are there safe zones?":
     "Only the immediate spawn area is a safe zone (no PVP/Griefing). Everywhere else is unsafe.",
+    "what happens if i break a rule?":
+    "Breaking any rule (like cheating or spamming) will result in a ban or mute by a staff member.",
 
-    # 4. Plugins and Features
+    # 4. Plugins and Features (Uitgebreid)
     "can i set a home?":
     "Yes, you can set **one** home using `/sethome` and return with `/home`.",
     "do i keep my inventory when i die?":
@@ -85,6 +87,12 @@ qa_data = {
     "No, we do not have `/tpa` or easy teleportation. This is to encourage discovery and difficulty.",
     "are there spawners?":
     "Yes, we have custom spawners that work with a **GUI interface** to manage mob spawning.",
+    "how do i use spawners?":
+    "Spawners can be managed via a **GUI interface** after being placed. You can buy spawners at the **/shop**.",
+    "can i teleport?":
+    "Only limited teleportation: `/home`, `/spawn`, and `/rtp` (random teleport). `/tpa` is disabled.",
+    "is pvp allowed?":
+    "PVP is allowed everywhere outside of the immediate spawn region. Be prepared to fight!",
 
     # 5. Community & Staff
     "who is the server owner?":
@@ -93,6 +101,8 @@ qa_data = {
     ADMIN_ANSWER,
     "who is the admin?":
     ADMIN_ANSWER,
+    "can i become staff?":
+    "We are currently not looking for staff, but keep an eye on announcements for applications!",
 
     # 6. General Chat / Bot Info
     "hello":
@@ -101,6 +111,26 @@ qa_data = {
     "I am DrMuffinBot, the official Q&A assistant for DrMuffinSMP.",
 }
 
+# --- 2. ALGEMENE KENNIS (Tweede zoekopdracht/Fallback) ---
+general_data = {
+    "how are you?":
+    "I am a Python bot hosted on Railway, so I'm always online and ready to help!",
+    "what is the capital of france?":
+    "The capital of France is Paris.",
+    "who invented minecraft?":
+    "Minecraft was created by Markus 'Notch' Persson.",
+    "what is the meaning of life?":
+    "The meaning of life, the universe, and everything is 42.",
+    "how old is minecraft?":
+    "Minecraft was first released in 2009, making it over a decade old!",
+    "tell me a joke":
+    "Why did the Minecraft player quit their job? Because they weren't getting enough diamonds!",
+    "what is the time difference between us and ukraine?":
+    "The time difference varies, but Ukraine is generally 1 or 2 hours ahead of Central European Time.",
+    "what is the weather like?":
+    "I'm a Discord bot, I can't check the local weather! Ask someone near a window!",
+}
+# -------------------------------------------------------------------
 
 # --- Dynamic function to get the current time ---
 def get_current_time_utc():
@@ -115,7 +145,9 @@ def get_current_time_utc():
 @bot.event
 async def on_ready():
     """Bevestigt dat de bot online en klaar is."""
-    print(f"✅ Bot online as {bot.user} with {len(qa_data)} known questions.")
+    print(
+        f"✅ Bot online as {bot.user} with {len(qa_data)} server questions and {len(general_data)} general questions."
+    )
 
 
 @bot.command()
@@ -128,7 +160,8 @@ async def ping(ctx):
 async def qa_status(ctx):
     """Toont hoeveel vragen de bot kent."""
     await ctx.send(
-        f"I currently know **{len(qa_data)}** answers about the server!")
+        f"I currently know **{len(qa_data)}** server answers and **{len(general_data)}** general answers!"
+    )
 
 
 @bot.command()
@@ -158,7 +191,7 @@ async def ask(ctx, *, question):
 
     question_lower = question.lower().strip()
 
-    # --- 1. Expliciete Trefwoordcontroles ---
+    # --- 1. Expliciete Trefwoordcontroles (Tijd/Regels/Offline) ---
     time_keywords = [
         "what time is it", "current time", "time now", "how late is it"
     ]
@@ -210,29 +243,41 @@ async def ask(ctx, *, question):
             f"The server is likely offline. {OFFLINE_ANSWER} Or use the new command `!startserver` for the direct link!"
         )
 
-    # --- 2. Statische QA (Fuzzy Match) ---
-    best_match, score = process.extractOne(question_lower, qa_data.keys())
+    # --- 2. Statische QA (Fuzzy Match SERVER-VRAGEN) ---
+    best_match_server, score_server = process.extractOne(
+        question_lower, qa_data.keys())
 
-    if score >= 50:
-        answer = qa_data[best_match]
+    if score_server >= 55:  # Iets hogere drempel voor servervragen
+        answer = qa_data[best_match_server]
         await ctx.send(
-            f"**Question Matched (Confidence: {score}%):**\n> {answer}")
-    else:
-        if score > 30:
-            await ctx.send(
-                f"Hmm, I'm not sure about that (Closest match was only {score}%). "
-                "Try phrasing your question differently, or check the pinned messages!"
-            )
-        else:
-            await ctx.send(
-                "Sorry, I don't know the answer 😅 Ask again or contact staff!")
+            f"**Server Vraag Beantwoord (Confidence: {score_server}%):**\n> {answer}"
+        )
+        return
+
+    # --- 3. Statische QA (Fuzzy Match ALGEMENE VRAGEN - Fallback) ---
+    best_match_general, score_general = process.extractOne(
+        question_lower, general_data.keys())
+
+    if score_general >= 60:  # Hogere drempel voor algemene vragen om willekeurige antwoorden te vermijden
+        answer = general_data[best_match_general]
+        await ctx.send(
+            f"**Algemene Vraag Beantwoord (Confidence: {score_general}%):**\n> {answer}"
+        )
+        return
+
+    # --- 4. Geen match ---
+    await ctx.send(
+        "Sorry, ik heb geen antwoord gevonden voor deze specifieke vraag. Ik kan u helpen met **serverregels** of **algemene Minecraft-vragen**!"
+    )
 
 
 # --- Start het bot programma ---
 if __name__ == '__main__':
     if not TOKEN:
         print("\nFATALE FOUT: Omgevingsvariabele 'DISCORD_TOKEN' niet gevonden.")
-        print("U moet deze instellen op uw hostingplatform (Render) voordat u de bot start.")
+        print(
+            "U moet deze instellen op uw hostingplatform (Railway) voordat u de bot start."
+        )
     else:
         try:
             bot.run(TOKEN)
