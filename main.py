@@ -78,7 +78,7 @@ qa_data = {
     "what happens if i break a rule?":
     "Breaking any rule (like cheating or spamming) will result in a ban or mute by a staff member.",
 
-    # 4. Plugins and Features (Uitgebreid)
+    # 4. Plugins and Features
     "can i set a home?":
     "Yes, you can set **one** home using `/sethome` and return with `/home`.",
     "do i keep my inventory when i die?":
@@ -142,12 +142,40 @@ def get_current_time_utc():
 
 
 # --- Events & Commands ---
+
 @bot.event
 async def on_ready():
     """Bevestigt dat de bot online en klaar is."""
     print(
         f"✅ Bot online as {bot.user} with {len(qa_data)} server questions and {len(general_data)} general questions."
     )
+
+
+@bot.event
+async def on_message(message):
+    """
+    Reageert op berichten die geen commando zijn door instructies te geven.
+    """
+    # Negeer berichten van bots
+    if message.author.bot:
+        return
+
+    # Verwerk eerst de commando's (bijv. !ping, !ask)
+    await bot.process_commands(message)
+
+    # Als het bericht begint met de prefix, dan was het de bedoeling een commando te zijn.
+    # We sturen dan GEEN instructiebericht, zelfs als het commando ongeldig was.
+    if message.content.startswith(bot.command_prefix):
+        return
+
+    # Als het bericht GEEN commando is, geef dan instructies.
+    if len(message.content.strip()) > 0: # Zorg ervoor dat het geen leeg bericht is
+        await message.channel.send(
+            f"Hoi {message.author.mention}! Ik ben DrMuffinBot. Om mij te gebruiken, start uw bericht met een commando, zoals:\n"
+            f"• **!ask [vraag]**: Voor antwoorden over de server, regels of algemene kennis.\n"
+            f"• **!ping**: Om mijn reactietijd te controleren.\n"
+            f"• **!startserver**: Voor de link om de server te starten."
+        )
 
 
 @bot.command()
