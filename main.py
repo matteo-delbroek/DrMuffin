@@ -11,7 +11,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 BOT_CHANNEL_ID = os.getenv('BOT_CHANNEL_ID')
 
 # --- 2. Constanten en Gedeelde Antwoordteksten ---
-# Deze bevatten alle gevraagde informatie (IP, namen, commands)
+# Gebaseerd op de informatie van de Lifesteal SMP server.
 ANSWERS = {
     "RULES": (
         "De regels zijn eenvoudig:\n"
@@ -24,10 +24,6 @@ ANSWERS = {
         "Ping hen bij ernstige problemen of vragen. De volledige tags zijn:\n"
         "• Matteo: `@matteo`\n"
         "• Jarno: `@Fuecoco Fan-` (of de tag zoals deze in Discord verschijnt)."
-    ),
-    "SEED": (
-        "We geven de map seed niet vrij! Dit is om de ontdekking en het 'survival'-aspect te behouden. "
-        "Gebruik `/rtp` om een willekeurige locatie te vinden."
     ),
     "SERVER_START_INSTRUCTIONS": (
         "Deze server draait op **Aternos** en moet handmatig worden gestart. "
@@ -104,8 +100,7 @@ class QACog(commands.Cog):
             embed.set_footer(text=footer)
         return embed
     
-  # Dit is de speciale methode die door discord.py wordt aangeroepen
-    # voor alle commando's in deze Cog. LET OP: GEEN @commands.check hier.
+    # GECORRIGEERD: GEEN @commands.check decorator meer, om de TypeError te voorkomen.
     async def cog_check(self, ctx):
         """Implementeert de kanaalbeperking."""
         # 1. Toegestaan als BOT_CHANNEL_ID niet is ingesteld
@@ -131,7 +126,8 @@ class QACog(commands.Cog):
                 color=discord.Color.orange()
             )
             await ctx.send(embed=warning_embed, delete_after=10)
-            return False
+            return False 
+
     @commands.command()
     async def ping(self, ctx):
         """Reageert met Pong!"""
@@ -224,12 +220,25 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CheckFailure):
         return
     
+    # Overige foutafhandeling
     if isinstance(error, commands.CommandNotFound):
-        # ... error handling ...
+        embed = discord.Embed(
+            title="❌ Onbekend Commando",
+            description=f"Het commando `!{ctx.invoked_with}` is ongeldig.\n"
+                        "Gebruik **`!ask [vraag]`** (bijv. `!ask wat is het ip`).",
+            color=discord.Color.dark_red()
+        )
+        await ctx.send(embed=embed, delete_after=10)
         return
     
     if isinstance(error, commands.MissingRequiredArgument):
-        # ... error handling ...
+        embed = discord.Embed(
+            title="⚠️ Argument Ontbreekt",
+            description=f"U bent een argument vergeten voor het commando `!{ctx.invoked_with}`.\n"
+                        f"Gebruik: `!{ctx.invoked_with} [vraag]`",
+            color=discord.Color.yellow()
+        )
+        await ctx.send(embed=embed, delete_after=10)
         return
 
 # --- Start het bot programma ---
@@ -239,7 +248,6 @@ if __name__ == '__main__':
         sys.exit(1)
         
     try:
-        # Dit is de enige regel die de bot daadwerkelijk start
         bot.run(TOKEN)
     except Exception as e:
         print(f"Een onbekende fout is opgetreden: {e}")
