@@ -3,315 +3,306 @@ from discord.ext import commands
 from fuzzywuzzy import process
 from datetime import datetime, timezone
 import os
+import sys
 
-# --- Beveiligde Token Lading ---
-# Belangrijk: De token wordt op het hostingplatform (Railway) ingesteld als een variabele genaamd DISCORD_TOKEN.
+# --- 1. Configuratie & Lading van Omgevingsvariabelen ---
+# Laad de benodigde variabelen
 TOKEN = os.getenv('DISCORD_TOKEN')
+BOT_CHANNEL_ID = os.getenv('BOT_CHANNEL_ID')
 
-# --- Discord Bot Configuratie & Intents setup ---
-intents = discord.Intents.default()
-intents.message_content = True
-
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-# --- Gedeelde Antwoordteksten ---
-RULES_ANSWER = (
-    "The rules are clear: 1. **Respect staff**. 2. **No NSFW/offensive/toxic behavior**. "
-    "3. No spamming/cheating. **4. Griefing & Stealing are fully allowed!** 😈")
-ADMIN_ANSWER = (
-    "The main administrator is **DrMuffin**! Our Moderators are XxGamerPro69xX and NoobMaster69. "
-    "Contact them with serious issues only.")
-SERVER_SEED = "The current map seed is **428938104847** - Good luck finding your way! We will not provide coordinates."
-OFFLINE_ANSWER = (
-    "Go to **https://freemcserver.net/server/1849684** to renew the server or check its status. It might just need a restart!"
-)
-SERVER_RENEWAL_LINK = "https://freemcserver.net/server/1849684/start"
-COMMANDS_ANSWER = (
-    "Key server commands include:\n"
-    "• **/sell**: Opens the selling menu for quick resource disposal.\n"
-    "• **/shop**: Opens the main server shop (buy items, buy spawners).\n"
-    "• **/spawn**: Safely returns you to the main spawn area.\n"
-    "• **/rtp**: Randomly teleports you to an unexplored location.\n"
-    "• **/afk**: Marks you as Away From Keyboard.\n"
-    "**NOTE: /tpa, /tpaccept, /tpdeny, and related commands are DISABLED!**")
-SELL_ANSWER = (
-    "To sell items, use the **/sell** command. This opens a dedicated menu allowing you to quickly sell "
-    "your mined and gathered resources for in-game currency. You can also sell items at the **/shop**."
-)
-# -------------------------------------------------------------------
-
-# --- 1. SERVER-SPECIFIEKE QA (Eerste zoekopdracht) ---
-qa_data = {
-    # 1. Server Connection & Status
-    "how do i join the server?":
-    "Use this IP: **DrMuffinSMP.enderman.cloud:29603**. Java Edition, cracked clients are allowed!",
-    "what is the server ip?":
-    "The current server IP is: **DrMuffinSMP.enderman.cloud:29603**",
-    "can i join the server?":
-    "Yes! We support Java Edition and cracked clients. IP: DrMuffinSMP.enderman.cloud:29603",
-    "is it a cracked server?":
-    "Yes, cracked clients are welcome to join!",
-    "what minecraft version is the server running?":
-    "We usually run the latest stable version of Minecraft (currently 1.20+). Check the `#announcements` channel for the exact version.",
-    "can i join via bedrock?":
-    "No, the server is **only** for Java Edition.",
-
-    # 2. Diamonds / Renewal & Economy
-    "how do i get a diamond?":
-    "Click **'Renew'** every 3 hours at **https://freemcserver.net/server/1849684** to get 1 diamond 🍩.",
-    "how do i renew the server?":
-    "Renew every 3 hours at **https://freemcserver.net/server/1849684** to earn a diamond!",
-    "how do i earn money?":
-    "Sell items in the shop near spawn to earn in-game money!",
-
-    # 3. Chaos & Rules
-    "is stealing allowed?":
-    "Yes, **stealing and looting is fully allowed**. Chaos is the rule on DrMuffinSMP! 😏",
-    "can i grief?":
-    "Yes, griefing, destroying, and raiding are **all allowed**. It's a chaos server!",
-    "is cheating allowed?":
-    "No. Cheating (like X-ray or flying hacks) is **strictly forbidden** and will result in a ban.",
-    "is raiding legal?":
-    "Yes, raiding other players' bases is a core part of the gameplay.",
-    "are there safe zones?":
-    "Only the immediate spawn area is a safe zone (no PVP/Griefing). Everywhere else is unsafe.",
-    "what happens if i break a rule?":
-    "Breaking any rule (like cheating or spamming) will result in a ban or mute by a staff member.",
-
-    # 4. Plugins and Features
-    "can i set a home?":
-    "Yes, you can set **one** home using `/sethome` and return with `/home`.",
-    "do i keep my inventory when i die?":
-    "No, keep inventory is **disabled**. If you die, you lose your items (except in the spawn zone).",
-    "is there /tpa?":
-    "No, we do not have `/tpa` or easy teleportation. This is to encourage discovery and difficulty.",
-    "are there spawners?":
-    "Yes, we have custom spawners that work with a **GUI interface** to manage mob spawning.",
-    "how do i use spawners?":
-    "Spawners can be managed via a **GUI interface** after being placed. You can buy spawners at the **/shop**.",
-    "can i teleport?":
-    "Only limited teleportation: `/home`, `/spawn`, and `/rtp` (random teleport). `/tpa` is disabled.",
-    "is pvp allowed?":
-    "PVP is allowed everywhere outside of the immediate spawn region. Be prepared to fight!",
-
-    # 5. Community & Staff
-    "who is the server owner?":
-    ADMIN_ANSWER,
-    "who are the staff?":
-    ADMIN_ANSWER,
-    "who is the admin?":
-    ADMIN_ANSWER,
-    "can i become staff?":
-    "We are currently not looking for staff, but keep an eye on announcements for applications!",
-
-    # 6. General Chat / Bot Info
-    "hello":
-    "Hello! I am DrMuffinBot. How can I help you enjoy the chaos?",
-    "who are you?":
-    "I am DrMuffinBot, the official Q&A assistant for DrMuffinSMP.",
+# --- 2. Constanten en Gedeelde Antwoordteksten (AANGEPAST VOOR LIFESTEAL SMP) ---
+ANSWERS = {
+    "RULES": (
+        "De regels zijn eenvoudig:\n"
+        "1. **Respecteer staff en andere spelers (geen toxiciteit/NSFW).**\n"
+        "2. **Geen spammen of cheaten (X-ray, vliegen, enz.).**\n"
+        "3. **Griefen en Stelen zijn toegestaan** (Het is een Lifesteal server, chaos hoort erbij!) 😈."
+    ),
+    "ADMIN": (
+        "De hoofdbeheerders zijn **matteo** en **Jarno** (@Fuecoco Fan-). "
+        "Ping hen met @matteo of @Fuecoco Fan- (Jarno) bij ernstige problemen of vragen."
+    ),
+    "SEED": (
+        "We geven de map seed niet vrij! Dit is om de ontdekking en het 'survival'-aspect te behouden. "
+        "Gebruik `/rtp` om een willekeurige locatie te vinden."
+    ),
+    "SERVER_START_INSTRUCTIONS": (
+        "Deze server draait op **Aternos** en moet handmatig worden gestart. "
+        "U moet de **Aternos-gebruikersnaam** (die in Discord is gedeeld) gebruiken om de server via `aternos.org` aan te zetten. "
+        "Matteo's bericht vermeldde: 'Stuur Aternos gebruikersnaam zodat je de server kan aanzetten.'"
+    ),
+    "IP_ADDRESS": "Livesteel_Matteo_D.aternos.me:25739",
+    "JOIN_INSTRUCTIONS": (
+        "1. **Installeer TLauncher** (of gebruik de echte Minecraft launcher).\n"
+        "2. Kies in TLauncher de versie **1.21.9** en druk op **Installeren**.\n"
+        "3. Open Minecraft, ga naar **Multiplayer** en vul het server-IP in: **Livesteel_Matteo_D.aternos.me:25739**."
+    ),
+    "COMMANDS": (
+        "Belangrijke servercommands (op basis van de commandolijst):\n"
+        "• **/tpa [speler]**: Stuur een teleport-verzoek naar iemand.\n"
+        "• **/tpahere [speler]**: Vraag iemand om naar jou toe te teleporteren.\n"
+        "• **/tpaccept / /tpdeny**: Accepteer of weiger een teleport-verzoek.\n"
+        "• **/spawn**: Teleporteer direct naar de spawn van de server.\n"
+        "• **/sethome [naam]**: Stel een persoonlijke thuislocatie in.\n"
+        "• **/home [naam]**: Teleporteer naar jouw ingestelde home.\n"
+        "• **/msg [speler] [bericht]**: Stuur een privé bericht naar iemand."
+    ),
 }
-
-# --- 2. ALGEMENE KENNIS (Tweede zoekopdracht/Fallback) ---
-general_data = {
-    "how are you?":
-    "I am a Python bot hosted on Railway, so I'm always online and ready to help!",
-    "what is the capital of france?":
-    "The capital of France is Paris.",
-    "who invented minecraft?":
-    "Minecraft was created by Markus 'Notch' Persson.",
-    "what is the meaning of life?":
-    "The meaning of life, the universe, and everything is 42.",
-    "how old is minecraft?":
-    "Minecraft was first released in 2009, making it over a decade old!",
-    "tell me a joke":
-    "Why did the Minecraft player quit their job? Because they weren't getting enough diamonds!",
-    "what is the time difference between us and ukraine?":
-    "The time difference varies, but Ukraine is generally 1 or 2 hours ahead of Central European Time.",
-    "what is the weather like?":
-    "I'm a Discord bot, I can't check the local weather! Ask someone near a window!",
-}
-# -------------------------------------------------------------------
 
 # --- Dynamic function to get the current time ---
 def get_current_time_utc():
     """Berekent de huidige tijd in UTC."""
     now_utc = datetime.now(timezone.utc)
     return now_utc.strftime(
-        "It is currently **%H:%M:%S UTC**. (Note: This time zone may not reflect the server's local time.)"
+        "Het is momenteel **%H:%M:%S UTC**. (Let op: Dit is niet de lokale tijd van de server host.)"
     )
 
+# --- QA DATA ---
+# Een gecombineerde QA-data met server-specifieke en algemene vragen.
+QA_DATA = {
+    # Server Connection & Status (Type: server)
+    "hoe kan ik de server joinen?": (ANSWERS["JOIN_INSTRUCTIONS"], "server"),
+    "wat is het server ip?": (f"Het huidige server IP is: **{ANSWERS['IP_ADDRESS']}**", "server"),
+    "wat is de ip?": (f"Het server IP is: **{ANSWERS['IP_ADDRESS']}**", "server"),
+    "welke versie moet ik gebruiken?": (f"U moet versie **1.21.9** gebruiken, zoals vermeld in #ip.", "server"),
+    "heb ik de echte minecraft nodig?": ("Nee, TLauncher is toegestaan om te joinen.", "server"),
+    "hoe start ik de server?": (ANSWERS["SERVER_START_INSTRUCTIONS"], "server"),
+    "is de server online?": (ANSWERS["SERVER_START_INSTRUCTIONS"], "server"),
+    
+    # Lifesteal & Chaos (Type: server)
+    "wat zijn de regels?": (ANSWERS["RULES"], "server"),
+    "is stelen toegestaan?": ("Ja, **stelen en grieven is volledig toegestaan** op deze Lifesteal server.", "server"),
+    "mag ik griefen?": ("Ja, griefing is toegestaan buiten de spawn.", "server"),
+    "is cheaten toegestaan?": ("Nee. Cheating (X-ray, hacks) is **strikt verboden** en leidt tot een ban.", "server"),
+    "wat gebeurt er als ik dood ga?": ("Omdat het een Lifesteal SMP is, verlies je mogelijk levens (harten) en je items.", "server"),
+    
+    # Plugins and Features (Type: server)
+    "zijn er commands?": (ANSWERS["COMMANDS"], "server"),
+    "kan ik tpa gebruiken?": ("Ja, **/tpa**, **/tpahere** en **/tpaccept** zijn ingeschakeld om te teleporteren.", "server"),
+    "kan ik een home zetten?": ("Ja, gebruik **/sethome [naam]** en **/home [naam]** om een home te zetten en te bereizen.", "server"),
+    "wat is de /spawn command?": ("**/spawn** teleporteert je veilig terug naar het beginpunt.", "server"),
+    
+    # Community & Staff (Type: server)
+    "wie is de admin?": (ANSWERS["ADMIN"], "server"),
+    "wie is de staff?": (ANSWERS["ADMIN"], "server"),
+    "wie zijn matteo en jarno?": (ANSWERS["ADMIN"], "server"),
+    
+    # Algemene Kennis (Type: general)
+    "hallo": ("Hoi! Ik ben de Lifesteal SMP Bot. Hoe kan ik je helpen met de server?", "general"),
+    "hoe gaat het?": ("Het gaat goed. Ik ben geprogrammeerd in Python en sta klaar om te helpen!", "general"),
+    "wat is aternos?": ("Aternos is een gratis Minecraft-serverhostingplatform dat gebruikt wordt voor deze server.", "general"),
+}
+# -------------------------------------------------------------------
 
-# --- Events & Commands ---
+# --- 3. QA (Vraag & Antwoord) Extensie (Cog) met Kanaalbeperking ---
+
+class QACog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.qa_data = QA_DATA
+        self.answers = ANSWERS
+        
+        # Converteer het omgevings-ID naar een integer
+        self.target_channel_id = None
+        if BOT_CHANNEL_ID:
+            try:
+                self.target_channel_id = int(BOT_CHANNEL_ID)
+            except ValueError:
+                print("FATALE FOUT: BOT_CHANNEL_ID moet een geldig nummer zijn.")
+                sys.exit(1)
+
+
+    def create_embed(self, title, description, color=discord.Color.red(), footer=None):
+        """Hulpfunctie voor het maken van een Discord Embed."""
+        embed = discord.Embed(
+            title=f"❤️ {title}",
+            description=description,
+            color=color,
+            timestamp=datetime.now(timezone.utc)
+        )
+        if footer:
+            embed.set_footer(text=footer)
+        return embed
+    
+    # CRUCIALE CONTROLE: Deze functie wordt uitgevoerd vóór elk commando in deze Cog.
+    @commands.check
+    async def cog_check(self, ctx):
+        """Implementeert de kanaalbeperking."""
+        # 1. Toegestaan als BOT_CHANNEL_ID niet is ingesteld
+        if self.target_channel_id is None:
+            return True 
+        
+        # 2. Toegestaan als het kanaal-ID overeenkomt
+        if ctx.channel.id == self.target_channel_id:
+            return True
+        else:
+            # 3. Commando gebruikt in het verkeerde kanaal
+            
+            # Probeer de kanaalnaam te vermelden (gebruikt bot.get_channel)
+            channel_mention = f"kanaal met ID `{self.target_channel_id}`"
+            try:
+                channel = self.bot.get_channel(self.target_channel_id)
+                if channel:
+                    channel_mention = channel.mention
+            except:
+                pass # Als we het kanaal niet kunnen vinden, gebruiken we de ID string
+                
+            warning_embed = self.create_embed(
+                title="❌ Verkeerd Kanaal Gebruikt",
+                description=f"Gelieve de bot-commando's (zoals `!ask`) te gebruiken in het toegewezen kanaal: {channel_mention}.",
+                color=discord.Color.orange()
+            )
+            
+            # Stuur de waarschuwing en verwijder deze na 10 seconden
+            await ctx.send(embed=warning_embed, delete_after=10)
+            return False # Voorkomt dat het commando doorgaat.
+
+    @commands.command()
+    async def ping(self, ctx):
+        """Reageert met Pong! om de latentie te controleren."""
+        await ctx.send(f"Pong! ❤️ (Latency: {round(self.bot.latency * 1000)}ms)")
+
+    @commands.command()
+    async def serverstatus(self, ctx):
+        """Geeft instructies over het starten van de server (Aternos)."""
+        embed = self.create_embed(
+            title="Aternos Server Starten",
+            description=self.answers["SERVER_START_INSTRUCTIONS"],
+            color=discord.Color.orange(),
+            footer="Vraag een stafflid om de Aternos-accountnaam."
+        )
+        await ctx.send(embed=embed)
+
+    @commands.command()
+    async def ask(self, ctx, *, question: str = None):
+        """
+        Beantwoordt een vraag op basis van expliciete trefwoorden of fuzzy matching.
+        """
+        if not question:
+            return await ctx.send("Gelieve een vraag op te geven na het `!ask` commando! Bijvoorbeeld: `!ask wat is het ip`")
+
+        question_lower = question.lower().strip()
+
+        # --- 1. Expliciete Trefwoordcontroles (voor vaste, belangrijke antwoorden) ---
+        explicit_answers = {
+            "time": (["hoe laat is het", "huidige tijd", "tijd nu"], get_current_time_utc(), "Huidige UTC Tijd", discord.Color.gold()),
+            "rules": (["wat zijn de regels", "toon mij de regels", "server regels", "regels"], self.answers["RULES"], "Server Regels", discord.Color.red()),
+            "admin": (["wie is de admin", "wie is staff", "wie is de eigenaar", "admin naam", "matteo", "jarno"], self.answers["ADMIN"], "Staff & Admin", discord.Color.purple()),
+            "ip": (["wat is de ip", "server adres", "join ip"], f"Het IP-adres is: **{self.answers['IP_ADDRESS']}**", "Server IP Adres", discord.Color.blue()),
+            "commands": (["wat zijn de commands", "alle commands", "commando lijst", "welke commands kan ik gebruiken", "/commands"], self.answers["COMMANDS"], "Server Commando's", discord.Color.teal()),
+            "join": (["hoe join ik", "hoe moet ik joinen", "hoe kan ik verbinden"], self.answers["JOIN_INSTRUCTIONS"], "Verbindingsinstructies", discord.Color.green())
+        }
+
+        for keywords, answer_content, title, color in explicit_answers.values():
+            if any(keyword in question_lower for keyword in keywords):
+                if callable(answer_content):
+                    answer_content = answer_content()
+
+                embed = self.create_embed(
+                    title=title,
+                    description=answer_content,
+                    color=color
+                )
+                return await ctx.send(embed=embed)
+
+        # --- 2. Fuzzy Matching (voor dynamische QA) ---
+        all_questions = list(self.qa_data.keys())
+        best_match, score = process.extractOne(question_lower, all_questions)
+
+        if score >= 55:  
+            answer_content, q_type = self.qa_data[best_match]
+            
+            # Hogere drempel voor 'general' vragen om willekeurige antwoorden te vermijden
+            if q_type == 'general' and score < 65:
+                pass # Ga naar Geen Match
+            else:
+                title = "Lifesteal Vraag Beantwoord" if q_type == 'server' else "Algemene Vraag Beantwoord"
+                color = discord.Color.red() if q_type == 'server' else discord.Color.dark_gray()
+
+                embed = self.create_embed(
+                    title=title,
+                    description=answer_content,
+                    color=color,
+                    footer=f"Vertrouwen: {score}% | Best gematcht met: '{best_match}'"
+                )
+                return await ctx.send(embed=embed)
+
+        # --- 3. Geen match ---
+        no_match_embed = self.create_embed(
+            title="🤔 Geen Antwoord Gevonden",
+            description="Sorry, ik heb geen antwoord gevonden voor deze vraag in mijn database.\n\n"
+                        "Probeer uw vraag te herformuleren of gebruik een van de trefwoorden: `!ask regels`, `!ask ip`, `!ask commands`.",
+            color=discord.Color.dark_grey()
+        )
+        await ctx.send(embed=no_match_embed)
+
+# -------------------------------------------------------------------
+
+# --- 4. Discord Bot Configuratie & Intents setup ---
+intents = discord.Intents.default()
+intents.message_content = True
+
+bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 @bot.event
 async def on_ready():
-    """Bevestigt dat de bot online en klaar is."""
-    print(
-        f"✅ Bot online as {bot.user} with {len(qa_data)} server questions and {len(general_data)} general questions."
-    )
+    """Bevestigt dat de bot online en klaar is en laadt de Cogs."""
+    print("----------------------------------------")
+    print(f"✅ Bot online as {bot.user} (Lifesteal SMP Mode)")
+    print(f"IP: {ANSWERS['IP_ADDRESS']}")
+    if BOT_CHANNEL_ID:
+        print(f"🔒 Commando's beperkt tot kanaal ID: {BOT_CHANNEL_ID}")
+    else:
+        print("⚠️ BOT_CHANNEL_ID is NIET ingesteld. Commando's werken overal.")
+    print("----------------------------------------")
 
+    # Laad de QA Extensie
+    try:
+        await bot.add_cog(QACog(bot))
+    except Exception as e:
+        print(f"❌ Fout bij het laden van QACog: {e}")
 
 @bot.event
-async def on_message(message):
-    """
-    Reageert op berichten die geen commando zijn door instructies te geven.
-    """
-    # Negeer berichten van bots
-    if message.author.bot:
+async def on_command_error(ctx, error):
+    """Afhandeling van commando-fouten."""
+    
+    # Belangrijk: De CheckFailure wordt genegeerd omdat de cog_check al een waarschuwing stuurt.
+    if isinstance(error, commands.CheckFailure):
         return
 
-    # Verwerk eerst de commando's (bijv. !ping, !ask)
-    await bot.process_commands(message)
-
-    # Als het bericht begint met de prefix, dan was het de bedoeling een commando te zijn.
-    # We sturen dan GEEN instructiebericht, zelfs als het commando ongeldig was.
-    if message.content.startswith(bot.command_prefix):
+    if isinstance(error, commands.CommandNotFound):
+        embed = discord.Embed(
+            title="❌ Onbekend Commando",
+            description=f"Het commando `!{ctx.invoked_with}` is ongeldig.\n"
+                        "Gebruik **`!ask [vraag]`** (bijv. `!ask wat is het ip`).",
+            color=discord.Color.dark_red()
+        )
+        await ctx.send(embed=embed, delete_after=10)
         return
-
-    # Als het bericht GEEN commando is, geef dan instructies.
-    if len(message.content.strip()) > 0: # Zorg ervoor dat het geen leeg bericht is
-        await message.channel.send(
-            f"Hoi {message.author.mention}! Ik ben DrMuffinBot. Om mij te gebruiken, start uw bericht met een commando, zoals:\n"
-            f"• **!ask [vraag]**: Voor antwoorden over de server, regels of algemene kennis.\n"
-            f"• **!ping**: Om mijn reactietijd te controleren.\n"
-            f"• **!startserver**: Voor de link om de server te starten."
+    
+    if isinstance(error, commands.MissingRequiredArgument):
+        embed = discord.Embed(
+            title="⚠️ Argument Ontbreekt",
+            description=f"U bent een argument vergeten voor het commando `!{ctx.invoked_with}`.\n"
+                        f"Gebruik: `!{ctx.invoked_with} [vraag]`",
+            color=discord.Color.yellow()
         )
-
-
-@bot.command()
-async def ping(ctx):
-    """Reageert met Pong! om de latentie te controleren."""
-    await ctx.send(f"Pong! 🍩 (Latency: {round(bot.latency * 1000)}ms)")
-
-
-@bot.command()
-async def qa_status(ctx):
-    """Toont hoeveel vragen de bot kent."""
-    await ctx.send(
-        f"I currently know **{len(qa_data)}** server answers and **{len(general_data)}** general answers!"
-    )
-
-
-@bot.command()
-async def startserver(ctx):
-    """
-    Legt uit dat de bot de server niet automatisch kan starten en geeft de handmatige link.
-    """
-    await ctx.send(
-        "I cannot automatically start the server as it requires a human to log in and click the button or solve a captcha. "
-        "Please visit the link yourself to manually check the status and start the server: "
-        f"**{SERVER_RENEWAL_LINK}**")
-
-
-@bot.command()
-async def ask(ctx, *, question):
-    """
-    Beantwoordt een vraag op basis van expliciete trefwoorden of fuzzy matching.
-    """
-    if isinstance(ctx.channel, discord.DMChannel):
-        return await ctx.send(
-            "Please use me in a server channel so the community can benefit from the answers!"
-        )
-
-    if not question:
-        return await ctx.send(
-            "Please provide a question after the `!ask` command!")
-
-    question_lower = question.lower().strip()
-
-    # --- 1. Expliciete Trefwoordcontroles (Tijd/Regels/Offline) ---
-    time_keywords = [
-        "what time is it", "current time", "time now", "how late is it"
-    ]
-    if any(keyword in question_lower for keyword in time_keywords):
-        return await ctx.send(get_current_time_utc())
-
-    rules_keywords = [
-        "what are the rules", "show me the rules", "server rules",
-        "tell me rules"
-    ]
-    if any(keyword in question_lower for keyword in rules_keywords):
-        return await ctx.send(RULES_ANSWER)
-
-    admin_keywords = [
-        "who is the admin", "who is staff", "who is the owner", "admin name",
-        "drmuffin"
-    ]
-    if any(keyword in question_lower for keyword in admin_keywords):
-        return await ctx.send(ADMIN_ANSWER)
-
-    seed_keywords = [
-        "what is the seed", "what seed is the server using", "server seed"
-    ]
-    if any(keyword in question_lower for keyword in seed_keywords):
-        return await ctx.send(SERVER_SEED)
-
-    commands_keywords = [
-        "what are the commands", "all the commands", "command list",
-        "what commands can i use", "/commands", "wath are the comands",
-        "list of commands"
-    ]
-    if any(keyword in question_lower for keyword in commands_keywords):
-        return await ctx.send(COMMANDS_ANSWER)
-
-    sell_keywords = [
-        "how to sell", "sell stuff", "selling items", "use sell command",
-        "/sell", "how much money"
-    ]
-    if any(keyword in question_lower for keyword in sell_keywords):
-        return await ctx.send(SELL_ANSWER)
-
-    offline_keywords = [
-        "server is not on", "server not starting", "server offline",
-        "server down", "server won't load", "not on", "server is not running",
-        "wath to do if the server is not on", "is the server up or down"
-    ]
-    if any(keyword in question_lower for keyword in offline_keywords):
-        return await ctx.send(
-            f"The server is likely offline. {OFFLINE_ANSWER} Or use the new command `!startserver` for the direct link!"
-        )
-
-    # --- 2. Statische QA (Fuzzy Match SERVER-VRAGEN) ---
-    best_match_server, score_server = process.extractOne(
-        question_lower, qa_data.keys())
-
-    if score_server >= 55:  # Iets hogere drempel voor servervragen
-        answer = qa_data[best_match_server]
-        await ctx.send(
-            f"**Server Vraag Beantwoord (Confidence: {score_server}%):**\n> {answer}"
-        )
+        await ctx.send(embed=embed, delete_after=10)
         return
-
-    # --- 3. Statische QA (Fuzzy Match ALGEMENE VRAGEN - Fallback) ---
-    best_match_general, score_general = process.extractOne(
-        question_lower, general_data.keys())
-
-    if score_general >= 60:  # Hogere drempel voor algemene vragen om willekeurige antwoorden te vermijden
-        answer = general_data[best_match_general]
-        await ctx.send(
-            f"**Algemene Vraag Beantwoord (Confidence: {score_general}%):**\n> {answer}"
-        )
-        return
-
-    # --- 4. Geen match ---
-    await ctx.send(
-        "Sorry, ik heb geen antwoord gevonden voor deze specifieke vraag. Ik kan u helpen met **serverregels** of **algemene Minecraft-vragen**!"
-    )
-
+    
+    # Log overige fouten
+    print(f"Fout opgetreden: {error}")
 
 # --- Start het bot programma ---
 if __name__ == '__main__':
     if not TOKEN:
         print("\nFATALE FOUT: Omgevingsvariabele 'DISCORD_TOKEN' niet gevonden.")
-        print(
-            "U moet deze instellen op uw hostingplatform (Railway) voordat u de bot start."
-        )
-    else:
-        try:
-            bot.run(TOKEN)
-        except discord.LoginFailure:
-            print(
-                "\nFATALE FOUT: De Discord Token is ongeldig. Controleer uw 'DISCORD_TOKEN' omgevingsvariabele."
-            )
-        except Exception as e:
-            print(f"Een onbekende fout is opgetreden: {e}")
+        sys.exit(1)
+    try:
+        bot.run(TOKEN)
+    except discord.LoginFailure:
+        print("\nFATALE FOUT: De Discord Token is ongeldig. Controleer uw 'DISCORD_TOKEN' omgevingsvariabele.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Een onbekende fout is opgetreden: {e}")
+        sys.exit(1)
