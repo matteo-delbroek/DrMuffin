@@ -6,12 +6,10 @@ import os
 import sys
 
 # --- 1. Configuratie & Lading van Omgevingsvariabelen ---
-# Zorg ervoor dat deze op uw hostingplatform zijn ingesteld!
 TOKEN = os.getenv('DISCORD_TOKEN')
 BOT_CHANNEL_ID = os.getenv('BOT_CHANNEL_ID')
 
 # --- 2. Constanten en Gedeelde Antwoordteksten ---
-# Gebaseerd op de informatie van de Lifesteal SMP server.
 ANSWERS = {
     "RULES": (
         "De regels zijn eenvoudig:\n"
@@ -47,12 +45,11 @@ ANSWERS = {
     ),
 }
 
-# Dynamic function for current time
 def get_current_time_utc():
     now_utc = datetime.now(timezone.utc)
     return now_utc.strftime("Het is momenteel **%H:%M:%S UTC**.")
 
-# --- QA DATA (Voor Fuzzy Matching van !ask) ---
+# --- QA DATA ---
 QA_DATA = {
     "hoe kan ik de server joinen?": (ANSWERS["JOIN_INSTRUCTIONS"], "server"),
     "wat is het server ip?": (f"Het huidige server IP is: **{ANSWERS['IP_ADDRESS']}**", "server"),
@@ -69,10 +66,8 @@ QA_DATA = {
     "hallo": ("Hoi! Ik ben de Lifesteal SMP Bot. Hoe kan ik je helpen met de server?", "general"),
     "wat is aternos?": ("Aternos is een gratis Minecraft-serverhostingplatform.", "general"),
 }
-# -------------------------------------------------------------------
 
-# --- 3. QA (Vraag & Antwoord) Extensie (Cog) met Kanaalbeperking ---
-
+# --- 3. QA Cog ---
 class QACog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -87,7 +82,6 @@ class QACog(commands.Cog):
                 print("FATALE FOUT: BOT_CHANNEL_ID is ingesteld maar geen geldig nummer.")
                 sys.exit(1)
 
-
     def create_embed(self, title, description, color=discord.Color.red(), footer=None):
         """Hulpfunctie voor het maken van een Discord Embed."""
         embed = discord.Embed(
@@ -100,18 +94,14 @@ class QACog(commands.Cog):
             embed.set_footer(text=footer)
         return embed
     
-    # GECORRIGEERD: GEEN @commands.check decorator meer, om de TypeError te voorkomen.
     async def cog_check(self, ctx):
         """Implementeert de kanaalbeperking."""
-        # 1. Toegestaan als BOT_CHANNEL_ID niet is ingesteld
         if self.target_channel_id is None:
             return True 
         
-        # 2. Toegestaan als het kanaal-ID overeenkomt
         if ctx.channel.id == self.target_channel_id:
             return True
         else:
-            # 3. Commando gebruikt in het verkeerde kanaal
             channel_mention = f"kanaal met ID `{self.target_channel_id}`"
             try:
                 channel = self.bot.get_channel(self.target_channel_id) 
@@ -152,17 +142,17 @@ class QACog(commands.Cog):
 
         question_lower = question.lower().strip()
 
-        # --- 1. Expliciete Trefwoordcontroles (voor snelle, vaste antwoorden) ---
-        explicit_answers = {
-            "time": (["hoe laat is het", "huidige tijd"], get_current_time_utc, "Huidige UTC Tijd", discord.Color.gold()),
-            "rules": (["wat zijn de regels", "server regels"], self.answers["RULES"], "Server Regels", discord.Color.red()),
-            "admin": (["wie is de admin", "wie is staff", "wie moet ik pingen"], self.answers["ADMIN"], "Staff & Admin", discord.Color.purple()),
-            "ip": (["wat is de ip", "server adres", "join ip"], f"Het IP-adres is: **{self.answers['IP_ADDRESS']}**", "Server IP Adres", discord.Color.blue()),
-            "commands": (["wat zijn de commands", "commando lijst"], self.answers["COMMANDS"], "Server Commando's", discord.Color.teal()),
-            "join": (["hoe join ik", "hoe moet ik joinen"], self.answers["JOIN_INSTRUCTIONS"], "Verbindingsinstructies", discord.Color.green())
-        }
+        # --- 1. Expliciete Trefwoordcontroles (GECORRIGEERD) ---
+        explicit_checks = [
+            (["hoe laat is het", "huidige tijd"], get_current_time_utc, "Huidige UTC Tijd", discord.Color.gold()),
+            (["wat zijn de regels", "server regels"], self.answers["RULES"], "Server Regels", discord.Color.red()),
+            (["wie is de admin", "wie is staff", "wie moet ik pingen"], self.answers["ADMIN"], "Staff & Admin", discord.Color.purple()),
+            (["wat is de ip", "server adres", "join ip"], f"Het IP-adres is: **{self.answers['IP_ADDRESS']}**", "Server IP Adres", discord.Color.blue()),
+            (["wat zijn de commands", "commando lijst"], self.answers["COMMANDS"], "Server Commando's", discord.Color.teal()),
+            (["hoe join ik", "hoe moet ik joinen"], self.answers["JOIN_INSTRUCTIONS"], "Verbindingsinstructies", discord.Color.green())
+        ]
 
-        for keywords, answer_content, title, color in explicit_answers.values():
+        for keywords, answer_content, title, color in explicit_checks:
             if any(keyword in question_lower for keyword in keywords):
                 if callable(answer_content):
                     answer_content = answer_content()
@@ -192,8 +182,6 @@ class QACog(commands.Cog):
         )
         await ctx.send(embed=no_match_embed)
 
-# -------------------------------------------------------------------
-
 # --- 4. Discord Bot Configuratie & Start ---
 intents = discord.Intents.default()
 intents.message_content = True
@@ -216,11 +204,9 @@ async def on_ready():
 
 @bot.event
 async def on_command_error(ctx, error):
-    # Negeer CheckFailure, omdat de cog_check de waarschuwing al stuurt.
     if isinstance(error, commands.CheckFailure):
         return
     
-    # Overige foutafhandeling
     if isinstance(error, commands.CommandNotFound):
         embed = discord.Embed(
             title="❌ Onbekend Commando",
