@@ -104,12 +104,19 @@ class QACog(commands.Cog):
             embed.set_footer(text=footer)
         return embed
     
-    @commands.check
+  # Dit is de speciale methode die door discord.py wordt aangeroepen
+    # voor alle commando's in deze Cog. LET OP: GEEN @commands.check hier.
     async def cog_check(self, ctx):
         """Implementeert de kanaalbeperking."""
-        if self.target_channel_id is None or ctx.channel.id == self.target_channel_id:
+        # 1. Toegestaan als BOT_CHANNEL_ID niet is ingesteld
+        if self.target_channel_id is None:
+            return True 
+        
+        # 2. Toegestaan als het kanaal-ID overeenkomt
+        if ctx.channel.id == self.target_channel_id:
             return True
         else:
+            # 3. Commando gebruikt in het verkeerde kanaal
             channel_mention = f"kanaal met ID `{self.target_channel_id}`"
             try:
                 channel = self.bot.get_channel(self.target_channel_id) 
@@ -124,8 +131,7 @@ class QACog(commands.Cog):
                 color=discord.Color.orange()
             )
             await ctx.send(embed=warning_embed, delete_after=10)
-            return False 
-
+            return False
     @commands.command()
     async def ping(self, ctx):
         """Reageert met Pong!"""
